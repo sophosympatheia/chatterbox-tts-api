@@ -4,8 +4,11 @@ Serve a [Chatterbox](https://huggingface.co/ResembleAI/chatterbox) TTS server wi
 
 ## Install
 
+Chatterbox can't be installed on Python versions > 3.12. You can use `conda` to use another version. If you're already running Python 3.12 ou 3.11, you can just use a `venv` (`python -m venv venv && source venv/bin/activate`) and ignore the conda part.
+
 ```sh
 conda create -n chatterbox python=3.12
+conda activate chatterbox
 pip install -r requirements.txt
 ```
 
@@ -16,6 +19,8 @@ python server.py path_to_voices_dir voices_list
 ```
 
 Server will run by default on http://127.0.0.1:5001/v1/audio/speech.
+
+Voice are expected to be wav audio files. For example, with `alloy.wav` is in `/home/user/voices`, you would run `python server.py /home/user/voices alloy`
 
 Running `server.py -h` will display the following help message.
 
