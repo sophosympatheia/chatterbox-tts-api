@@ -1,4 +1,4 @@
-# Chatterbox-api
+# Chatterbox-tts-api
 
 Serve a [Chatterbox](https://huggingface.co/ResembleAI/chatterbox) TTS server with an [OpenAI Compatible API Speech endpoint](https://platform.openai.com/docs/api-reference/audio/createSpeech).
 
@@ -40,6 +40,16 @@ options:
   --temperature TEMPERATURE
                         Temperature for the audio. Default: 0.8
   --cfg CFG             CFG weight for the audio. Default: 0.5
+```
+
+### Using the API
+
+See [OpenAI Compatible API Speech endpoint](https://platform.openai.com/docs/api-reference/audio/createSpeech). This API takes a json containing an input text and a voice and replies with the TTS audio data. 
+
+Example API call with `curl`:
+
+```sh
+curl -X POST http://localhost:5001/v1/audio/speech -H "Content-Type: application/json" -d '{"input": "Hello, this is a test.", "voice": "alloy"}' --output speech.wav
 ```
 
 ### Usage in SillyTavern
