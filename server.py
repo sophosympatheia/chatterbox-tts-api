@@ -62,11 +62,7 @@ app = Flask(__name__)
 # Initialize the TTS model
 tts_model = ChatterboxTTS.from_pretrained(DEVICE)
 
-def generate_audio(text, model, voice, speed=1.0):
-    # Initialize the TTS model based on the selected model
-    # if model not in SUPPORTED_MODELS:
-    #     raise ValueError("Unsupported model specified.")
-
+def generate_audio(text, voice, speed=1.0):
     voice_file = AUDIO_PROMPT_PATH + f"{voice}.wav"
 
     # Generate the waveform
@@ -124,7 +120,6 @@ def speech():
 
     # Extract parameters from the request
     text = data.get("input")
-    # model = data.get("model")
     voice = data.get("voice")
     speed = data.get("speed", 1.0)  # Default speed is 1.0
     response_format = data.get(
@@ -141,8 +136,6 @@ def speech():
             ),
             400,
         )
-    # if model not in SUPPORTED_MODELS:
-    #     return jsonify({"error": "Unsupported model specified."}), 400
     if voice not in SUPPORTED_VOICES:
         return jsonify({"error": "Unsupported voice specified."}), 400
     if response_format not in SUPPORTED_RESPONSE_FORMATS:
@@ -157,7 +150,7 @@ def speech():
         )
 
     # Generate audio from the text
-    audio_data = generate_audio(text, model, voice, speed)
+    audio_data = generate_audio(text, voice, speed)
 
     # Convert the audio data to the desired format
     converted_audio_data = convert_audio_format(audio_data, response_format)
