@@ -20,7 +20,7 @@ python server.py path_to_voices_dir voices_list
 
 Server will run by default on http://127.0.0.1:5001/v1/audio/speech.
 
-Voice are expected to be wav audio files. For example, with `alloy.wav` is in `/home/user/voices`, you would run `python server.py /home/user/voices alloy`
+Voice are expected to be wav audio files. For example, with a directory `/home/user/voices` containing `alloy.wav`, you would run `python server.py /home/user/voices alloy`
 
 Running `server.py -h` will display the following help message.
 
