@@ -39,6 +39,7 @@ AUDIO_EXAGGERATION = audio_gen_config.get('exaggeration', 0.5)
 AUDIO_TEMPERATURE = audio_gen_config.get('temperature', 0.8)
 AUDIO_CFG_WEIGHT = audio_gen_config.get('cfg_weight', 0.5)
 AUDIO_SEED = audio_gen_config.get('seed', 0) # New seed setting
+AUDIO_DEFAULT_RESPONSE_FORMAT = audio_gen_config.get('default_response_format', 'wav')
 # REMOVE_SILENCE is now part of silence_removal section
 
 # Text Processing Settings
@@ -87,7 +88,7 @@ SUPPORTED_RESPONSE_FORMATS = ["mp3", "opus", "aac", "flac", "wav", "pcm"]
 print(f"🚀 Running on device: {DEVICE}")
 print(f"📝 Loaded configuration from: {args.config_path}")
 print(f"🔊 Voices directory: {AUDIO_PROMPT_PATH}")
-base_settings_info = f"Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, Seed={AUDIO_SEED}, ChunkSize={MAX_CHUNK_LENGTH}"
+base_settings_info = f"Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, Seed={AUDIO_SEED}, DefaultFormat={AUDIO_DEFAULT_RESPONSE_FORMAT}, ChunkSize={MAX_CHUNK_LENGTH}"
 silence_settings_info = f"RemoveSilenceEnabled={REMOVE_SILENCE_ENABLED}"
 if REMOVE_SILENCE_ENABLED:
     silence_settings_info += (
@@ -377,8 +378,8 @@ def speech():
     voice = data.get("voice")
     speed = data.get("speed", 1.0)  # Default speed is 1.0
     response_format = data.get(
-        "response_format", "wav"
-    )  # Default response format is wav
+        "response_format", AUDIO_DEFAULT_RESPONSE_FORMAT
+    )  # Default response format from config
 
     # Validate parameters
     if not text or len(text) > 4096:

@@ -9,6 +9,7 @@ audio_generation:
   temperature: 0.8
   cfg_weight: 0.5
   seed: 0 # Seed for reproducibility. If 0, passed directly. If non-zero, set_seed() is called first.
+  default_response_format: "wav" # Default audio output format. Options: "mp3", "opus", "aac", "flac", "wav", "pcm"
 
 # Text processing
 text_processing:
