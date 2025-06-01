@@ -9,7 +9,6 @@ audio_generation:
   temperature: 0.8
   cfg_weight: 0.5
   seed: 0 # Seed for reproducibility. If 0, passed directly. If non-zero, set_seed() is called first.
-  # remove_silence: false # This setting is moved to its own section
 
 # Text processing
 text_processing:
