@@ -1,11 +1,15 @@
 # Server configuration
-port: 5001
-host: "127.0.0.1"
+server_settings:
+  port: 5001
+  host: "127.0.0.1"
 
 # Audio generation parameters
-exaggeration: 0.5
-temperature: 0.8
-cfg_weight: 0.5
+audio_generation:
+  exaggeration: 0.5
+  temperature: 0.8
+  cfg_weight: 0.5
+  remove_silence: false # New setting for silence removal
 
 # Text processing
-chunk_size: 240 # Maximum length for text chunks
+text_processing:
+  chunk_size: 240 # Maximum length for text chunks

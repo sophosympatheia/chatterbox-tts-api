@@ -26,12 +26,21 @@ except yaml.YAMLError as e:
     exit(1)
 
 # Assign settings from config or use defaults
-API_PORT = config.get('port', 5001)
-API_HOST = config.get('host', "127.0.0.1")
-AUDIO_EXAGGERATION = config.get('exaggeration', 0.5)
-AUDIO_TEMPERATURE = config.get('temperature', 0.8)
-AUDIO_CFG_WEIGHT = config.get('cfg_weight', 0.5)
-MAX_CHUNK_LENGTH = config.get('chunk_size', 300)
+# Server Settings
+server_config = config.get('server_settings', {})
+API_PORT = server_config.get('port', 5001)
+API_HOST = server_config.get('host', "127.0.0.1")
+
+# Audio Generation Settings
+audio_gen_config = config.get('audio_generation', {})
+AUDIO_EXAGGERATION = audio_gen_config.get('exaggeration', 0.5)
+AUDIO_TEMPERATURE = audio_gen_config.get('temperature', 0.8)
+AUDIO_CFG_WEIGHT = audio_gen_config.get('cfg_weight', 0.5)
+REMOVE_SILENCE = audio_gen_config.get('remove_silence', False) # New setting
+
+# Text Processing Settings
+text_proc_config = config.get('text_processing', {})
+MAX_CHUNK_LENGTH = text_proc_config.get('chunk_size', 300)
 
 
 AUDIO_PROMPT_PATH = args.voices_dir
@@ -66,7 +75,7 @@ SUPPORTED_RESPONSE_FORMATS = ["mp3", "opus", "aac", "flac", "wav", "pcm"]
 print(f"🚀 Running on device: {DEVICE}")
 print(f"📝 Loaded configuration from: {args.config_path}")
 print(f"🔊 Voices directory: {AUDIO_PROMPT_PATH}")
-print(f"⚙️ Settings: Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, ChunkSize={MAX_CHUNK_LENGTH}")
+print(f"⚙️ Settings: Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, ChunkSize={MAX_CHUNK_LENGTH}, RemoveSilence={REMOVE_SILENCE}")
 
 
 def split_text_into_chunks(text: str, max_length: int) -> list[str]: # max_length will be passed MAX_CHUNK_LENGTH
