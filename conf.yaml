@@ -1,0 +1,11 @@
+# Server configuration
+port: 5001
+host: "127.0.0.1"
+
+# Audio generation parameters
+exaggeration: 0.5
+temperature: 0.8
+cfg_weight: 0.5 # Corresponds to the 'cfg' command-line argument
+
+# Text processing
+chunk_size: 300 # Maximum length for text chunks

@@ -4,51 +4,41 @@ import os
 import numpy as np
 import wave
 import torch
+import yaml # Added import
 from chatterbox.tts import ChatterboxTTS
 import argparse
 from pydub import AudioSegment
 
 parser = argparse.ArgumentParser("server.py")
+parser.add_argument("config_path", help="Path to the YAML configuration file.", type=str)
 parser.add_argument("voices_dir", help="Path to the audio prompt files dir.", type=str)
-parser.add_argument(
-    "--port", help="Port to run the server on. Default: 5001", type=int, default=5001
-)
-parser.add_argument(
-    "--host",
-    help="Host to run the server on. Default: 127.0.0.1",
-    type=str,
-    default="127.0.0.1",
-)
-parser.add_argument(
-    "--exaggeration",
-    help="Exaggeration factor for the audio. Default: 0.5",
-    type=float,
-    default=0.5,
-)
-parser.add_argument(
-    "--temperature",
-    help="Temperature for the audio. Default: 0.8",
-    type=float,
-    default=0.8,
-)
-parser.add_argument(
-    "--cfg",
-    help="CFG weight for the audio. Default: 0.5",
-    type=float,
-    default=0.5,
-)
 args = parser.parse_args()
+
+# Load configuration from YAML file
+try:
+    with open(args.config_path, 'r') as f:
+        config = yaml.safe_load(f)
+except FileNotFoundError:
+    print(f"Error: Configuration file '{args.config_path}' not found. Exiting.")
+    exit(1)
+except yaml.YAMLError as e:
+    print(f"Error parsing YAML configuration file '{args.config_path}': {e}. Exiting.")
+    exit(1)
+
+# Assign settings from config or use defaults
+API_PORT = config.get('port', 5001)
+API_HOST = config.get('host', "127.0.0.1")
+AUDIO_EXAGGERATION = config.get('exaggeration', 0.5)
+AUDIO_TEMPERATURE = config.get('temperature', 0.8)
+AUDIO_CFG_WEIGHT = config.get('cfg_weight', 0.5)
+MAX_CHUNK_LENGTH = config.get('chunk_size', 300)
+
 
 AUDIO_PROMPT_PATH = args.voices_dir
 if AUDIO_PROMPT_PATH[-1] != "/":
     AUDIO_PROMPT_PATH += "/"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-API_PORT = args.port
-API_HOST = args.host
-AUDIO_EXAGGERATION = args.exaggeration
-AUDIO_TEMPERATURE = args.temperature
-AUDIO_CFG_WEIGHT = args.cfg
 
 # Dynamically build SUPPORTED_VOICES from voices_dir
 try:
@@ -71,11 +61,15 @@ except Exception as e:
 
 SUPPORTED_RESPONSE_FORMATS = ["mp3", "opus", "aac", "flac", "wav", "pcm"]
 
-MAX_CHUNK_LENGTH = 300
+# MAX_CHUNK_LENGTH is now loaded from config
 
 print(f"🚀 Running on device: {DEVICE}")
+print(f"📝 Loaded configuration from: {args.config_path}")
+print(f"🔊 Voices directory: {AUDIO_PROMPT_PATH}")
+print(f"⚙️ Settings: Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, ChunkSize={MAX_CHUNK_LENGTH}")
 
-def split_text_into_chunks(text: str, max_length: int = 300) -> list[str]:
+
+def split_text_into_chunks(text: str, max_length: int) -> list[str]: # max_length will be passed MAX_CHUNK_LENGTH
     """
     Splits a long text into chunks of max_length, trying to respect sentence boundaries.
     """
@@ -127,7 +121,7 @@ tts_model = ChatterboxTTS.from_pretrained(DEVICE)
 def generate_audio(text, voice, speed=1.0):
     voice_file = AUDIO_PROMPT_PATH + f"{voice}.wav"
 
-    text_chunks = split_text_into_chunks(text, max_length=MAX_CHUNK_LENGTH)
+    text_chunks = split_text_into_chunks(text, max_length=MAX_CHUNK_LENGTH) # Pass configured MAX_CHUNK_LENGTH
 
     if not text_chunks:
         print("No text chunks to process after splitting.")
