@@ -50,6 +50,7 @@ SR_LT_SILENCE_THRESH_DBFS = silence_config.get('lt_silence_thresh_dbfs', -40)
 SR_LT_MIN_SILENCE_DURATION_MS = silence_config.get('lt_min_silence_duration_ms', 500)
 SR_INT_MIN_SILENCE_LEN_MS = silence_config.get('int_min_silence_len_ms', 700)
 SR_INT_SILENCE_THRESH_DBFS = silence_config.get('int_silence_thresh_dbfs', -35)
+SR_INT_KEEP_SILENCE_MS = silence_config.get('int_keep_silence_ms', 300)
 
 
 AUDIO_PROMPT_PATH = args.voices_dir
@@ -90,6 +91,7 @@ if REMOVE_SILENCE_ENABLED:
     silence_settings_info += (
         f", LtSilenceThresh={SR_LT_SILENCE_THRESH_DBFS}dBFS, LtMinSilenceDur={SR_LT_MIN_SILENCE_DURATION_MS}ms"
         f", IntMinSilenceLen={SR_INT_MIN_SILENCE_LEN_MS}ms, IntSilenceThresh={SR_INT_SILENCE_THRESH_DBFS}dBFS"
+        f", IntKeepSilence={SR_INT_KEEP_SILENCE_MS}ms"
     )
 print(f"⚙️ Settings: {base_settings_info}, {silence_settings_info}")
 
@@ -143,15 +145,16 @@ app = Flask(__name__)
 tts_model = ChatterboxTTS.from_pretrained(DEVICE)
 
 def remove_silence_from_audio(
-    wav_bytes: bytes, 
-    cfg_lt_silence_thresh_dbfs: int, 
+    wav_bytes: bytes,
+    cfg_lt_silence_thresh_dbfs: int,
     cfg_lt_min_silence_duration_ms: int,
     cfg_int_min_silence_len_ms: int,
-    cfg_int_silence_thresh_dbfs: int
+    cfg_int_silence_thresh_dbfs: int,
+    cfg_int_keep_silence_ms: int
 ) -> bytes:
     """
     Removes leading, trailing, and internal silences from WAV audio data.
-    Leading/trailing and some internal silence parameters are configurable.
+    Most silence parameters are configurable.
     Internal silence parameters are currently hardcoded.
     """
     try:
@@ -168,7 +171,7 @@ def remove_silence_from_audio(
     # Internal (partially hardcoded, partially from config)
     # int_min_silence_len_ms = 700 # Now from arg: cfg_int_min_silence_len_ms
     # int_silence_thresh_dbfs = -35 # Now from arg: cfg_int_silence_thresh_dbfs
-    int_keep_silence_ms = 300 # Amount of silence to keep around cuts for internal silences (still hardcoded)
+    # int_keep_silence_ms = 300 # Now from arg: cfg_int_keep_silence_ms
 
     original_duration_ms = len(audio)
     if original_duration_ms == 0:
@@ -209,7 +212,7 @@ def remove_silence_from_audio(
         trimmed_audio,
         min_silence_len=cfg_int_min_silence_len_ms,
         silence_thresh=cfg_int_silence_thresh_dbfs,
-        keep_silence=int_keep_silence_ms
+        keep_silence=cfg_int_keep_silence_ms
     )
 
     if not chunks:
@@ -314,7 +317,8 @@ def generate_audio(text, voice, speed=1.0):
                 cfg_lt_silence_thresh_dbfs=SR_LT_SILENCE_THRESH_DBFS,
                 cfg_lt_min_silence_duration_ms=SR_LT_MIN_SILENCE_DURATION_MS,
                 cfg_int_min_silence_len_ms=SR_INT_MIN_SILENCE_LEN_MS,
-                cfg_int_silence_thresh_dbfs=SR_INT_SILENCE_THRESH_DBFS
+                cfg_int_silence_thresh_dbfs=SR_INT_SILENCE_THRESH_DBFS,
+                cfg_int_keep_silence_ms=SR_INT_KEEP_SILENCE_MS
             )
             print("Silence removal process completed.")
         else:

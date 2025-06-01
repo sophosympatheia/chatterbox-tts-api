@@ -23,5 +23,5 @@ silence_removal:
   # Parameters for internal silence detection
   int_min_silence_len_ms: 1500     # Minimum duration of internal silence to be considered for removal (ms)
   int_silence_thresh_dbfs: -35    # Silence threshold (dBFS) for internal silences
-  # Note: int_keep_silence_ms is still hardcoded in the remove_silence_from_audio function.
+  int_keep_silence_ms: 300        # Amount of silence to keep around cuts for internal silences (ms)
 
