@@ -14,33 +14,50 @@ pip install -r requirements.txt
 
 ## Usage
 
+The server is now configured primarily through a YAML configuration file.
+
 ```sh
-python server.py path_to_voices_dir voices_list
+python server.py path/to/your/conf.yaml path/to/your/voices_dir
 ```
 
-Server will run by default on http://127.0.0.1:5001/v1/audio/speech.
-
-Voice are expected to be wav audio files. For example, with a directory `/home/user/voices` containing `alloy.wav`, you would run `python server.py /home/user/voices alloy`
-
-Running `server.py -h` will display the following help message.
-
+**Example:**
+```sh
+python server.py conf.yaml ./voices
 ```
-usage: server.py [-h] [--port PORT] [--host HOST] [--exaggeration EXAGGERATION] [--temperature TEMPERATURE] [--cfg CFG] voices_dir supported_voices
+
+*   `conf.yaml`: Path to your YAML configuration file (see "Configuration" section below).
+*   `voices_dir`: Path to the directory containing your `.wav` voice prompt files. The server will automatically detect voices from the filenames (e.g., `alloy.wav` becomes voice `alloy`).
+
+Server will run by default on `http://127.0.0.1:5001` (configurable in `conf.yaml`). The API endpoint is `/v1/audio/speech`.
+
+Running `server.py -h` will display the following help message:
+```
+usage: server.py [-h] config_path voices_dir
 
 positional arguments:
-  voices_dir            Path to the audio prompt files dir.
-  supported_voices      Comma-separated list of supported voices. Example: 'alloy,ash,ballad,coral,echo,fable,onyx,nova,sage,shimmer,verse'
+  config_path  Path to the YAML configuration file.
+  voices_dir   Path to the audio prompt files dir.
 
 options:
-  -h, --help            show this help message and exit
-  --port PORT           Port to run the server on. Default: 5001
-  --host HOST           Host to run the server on. Default: 127.0.0.1
-  --exaggeration EXAGGERATION
-                        Exaggeration factor for the audio. Default: 0.5
-  --temperature TEMPERATURE
-                        Temperature for the audio. Default: 0.8
-  --cfg CFG             CFG weight for the audio. Default: 0.5
+  -h, --help   show this help message and exit
 ```
+
+## Configuration
+
+The server's behavior is controlled by a YAML configuration file (e.g., `conf.yaml`). This file allows you to set:
+
+*   **Server Settings**: `host` and `port`.
+*   **Audio Generation Parameters**:
+    *   `exaggeration`, `temperature`, `cfg_weight`: Control the characteristics of the generated speech. See comments in `conf.yaml` for details.
+    *   `seed`: For reproducible audio output. `0` for random.
+    *   `default_response_format`: The default audio format if not specified in the API request (e.g., "wav", "mp3").
+*   **Text Processing**:
+    *   `chunk_size`: Long input texts are split into smaller chunks to ensure stable generation. This sets the maximum length for these chunks.
+*   **Silence Removal (Experimental)**:
+    *   `enabled`: Master switch to turn on/off silence removal.
+    *   Various parameters (`lt_silence_thresh_dbfs`, `lt_min_silence_duration_ms`, etc.) to fine-tune the detection and removal of leading, trailing, and internal silences. This feature is experimental and may require tuning.
+
+Refer to the provided `conf.yaml` file for an example structure and default values.
 
 ### Using the API
 
