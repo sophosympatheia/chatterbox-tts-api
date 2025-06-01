@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_file
 import io
 import os
+import random # Added for set_seed
 import numpy as np
 import wave
 import torch
@@ -37,6 +38,7 @@ audio_gen_config = config.get('audio_generation', {})
 AUDIO_EXAGGERATION = audio_gen_config.get('exaggeration', 0.5)
 AUDIO_TEMPERATURE = audio_gen_config.get('temperature', 0.8)
 AUDIO_CFG_WEIGHT = audio_gen_config.get('cfg_weight', 0.5)
+AUDIO_SEED = audio_gen_config.get('seed', 0) # New seed setting
 # REMOVE_SILENCE is now part of silence_removal section
 
 # Text Processing Settings
@@ -85,7 +87,7 @@ SUPPORTED_RESPONSE_FORMATS = ["mp3", "opus", "aac", "flac", "wav", "pcm"]
 print(f"🚀 Running on device: {DEVICE}")
 print(f"📝 Loaded configuration from: {args.config_path}")
 print(f"🔊 Voices directory: {AUDIO_PROMPT_PATH}")
-base_settings_info = f"Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, ChunkSize={MAX_CHUNK_LENGTH}"
+base_settings_info = f"Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, Seed={AUDIO_SEED}, ChunkSize={MAX_CHUNK_LENGTH}"
 silence_settings_info = f"RemoveSilenceEnabled={REMOVE_SILENCE_ENABLED}"
 if REMOVE_SILENCE_ENABLED:
     silence_settings_info += (
@@ -95,6 +97,13 @@ if REMOVE_SILENCE_ENABLED:
     )
 print(f"⚙️ Settings: {base_settings_info}, {silence_settings_info}")
 
+
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
 def split_text_into_chunks(text: str, max_length: int) -> list[str]: # max_length will be passed MAX_CHUNK_LENGTH
     """
@@ -235,6 +244,13 @@ def remove_silence_from_audio(
 def generate_audio(text, voice, speed=1.0):
     voice_file = AUDIO_PROMPT_PATH + f"{voice}.wav"
 
+    # Set seed if configured to a non-zero value
+    if AUDIO_SEED != 0:
+        print(f"Setting global seed to: {AUDIO_SEED}")
+        set_seed(AUDIO_SEED)
+    else:
+        print(f"Using seed {AUDIO_SEED} directly for TTS generation without setting global seed.")
+
     text_chunks = split_text_into_chunks(text, max_length=MAX_CHUNK_LENGTH) # Pass configured MAX_CHUNK_LENGTH
 
     if not text_chunks:
@@ -263,6 +279,7 @@ def generate_audio(text, voice, speed=1.0):
             audio_prompt_path=voice_file,
             exaggeration=AUDIO_EXAGGERATION,
             temperature=AUDIO_TEMPERATURE,
+            seed_num=AUDIO_SEED,
             cfg_weight=AUDIO_CFG_WEIGHT,
         )
         
