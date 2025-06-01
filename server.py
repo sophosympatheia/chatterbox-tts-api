@@ -48,6 +48,8 @@ silence_config = config.get('silence_removal', {})
 REMOVE_SILENCE_ENABLED = silence_config.get('enabled', False)
 SR_LT_SILENCE_THRESH_DBFS = silence_config.get('lt_silence_thresh_dbfs', -40)
 SR_LT_MIN_SILENCE_DURATION_MS = silence_config.get('lt_min_silence_duration_ms', 500)
+SR_INT_MIN_SILENCE_LEN_MS = silence_config.get('int_min_silence_len_ms', 700)
+SR_INT_SILENCE_THRESH_DBFS = silence_config.get('int_silence_thresh_dbfs', -35)
 
 
 AUDIO_PROMPT_PATH = args.voices_dir
@@ -85,7 +87,10 @@ print(f"🔊 Voices directory: {AUDIO_PROMPT_PATH}")
 base_settings_info = f"Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, ChunkSize={MAX_CHUNK_LENGTH}"
 silence_settings_info = f"RemoveSilenceEnabled={REMOVE_SILENCE_ENABLED}"
 if REMOVE_SILENCE_ENABLED:
-    silence_settings_info += f", LtSilenceThresh={SR_LT_SILENCE_THRESH_DBFS}dBFS, LtMinSilenceDur={SR_LT_MIN_SILENCE_DURATION_MS}ms"
+    silence_settings_info += (
+        f", LtSilenceThresh={SR_LT_SILENCE_THRESH_DBFS}dBFS, LtMinSilenceDur={SR_LT_MIN_SILENCE_DURATION_MS}ms"
+        f", IntMinSilenceLen={SR_INT_MIN_SILENCE_LEN_MS}ms, IntSilenceThresh={SR_INT_SILENCE_THRESH_DBFS}dBFS"
+    )
 print(f"⚙️ Settings: {base_settings_info}, {silence_settings_info}")
 
 
@@ -137,10 +142,16 @@ app = Flask(__name__)
 # Initialize the TTS model
 tts_model = ChatterboxTTS.from_pretrained(DEVICE)
 
-def remove_silence_from_audio(wav_bytes: bytes, cfg_lt_silence_thresh_dbfs: int, cfg_lt_min_silence_duration_ms: int) -> bytes:
+def remove_silence_from_audio(
+    wav_bytes: bytes, 
+    cfg_lt_silence_thresh_dbfs: int, 
+    cfg_lt_min_silence_duration_ms: int,
+    cfg_int_min_silence_len_ms: int,
+    cfg_int_silence_thresh_dbfs: int
+) -> bytes:
     """
     Removes leading, trailing, and internal silences from WAV audio data.
-    Leading/trailing silence parameters are configurable.
+    Leading/trailing and some internal silence parameters are configurable.
     Internal silence parameters are currently hardcoded.
     """
     try:
@@ -154,10 +165,10 @@ def remove_silence_from_audio(wav_bytes: bytes, cfg_lt_silence_thresh_dbfs: int,
     # lt_silence_thresh_dbfs = -40 # Now from arg: cfg_lt_silence_thresh_dbfs
     # lt_min_silence_duration_ms = 500 # Now from arg: cfg_lt_min_silence_duration_ms
     
-    # Internal (still hardcoded)
-    int_min_silence_len_ms = 700
-    int_silence_thresh_dbfs = -35
-    int_keep_silence_ms = 300 # Amount of silence to keep around cuts for internal silences
+    # Internal (partially hardcoded, partially from config)
+    # int_min_silence_len_ms = 700 # Now from arg: cfg_int_min_silence_len_ms
+    # int_silence_thresh_dbfs = -35 # Now from arg: cfg_int_silence_thresh_dbfs
+    int_keep_silence_ms = 300 # Amount of silence to keep around cuts for internal silences (still hardcoded)
 
     original_duration_ms = len(audio)
     if original_duration_ms == 0:
@@ -196,8 +207,8 @@ def remove_silence_from_audio(wav_bytes: bytes, cfg_lt_silence_thresh_dbfs: int,
     # 3. Remove awkward pauses (internal silences)
     chunks = split_on_silence(
         trimmed_audio,
-        min_silence_len=int_min_silence_len_ms,
-        silence_thresh=int_silence_thresh_dbfs,
+        min_silence_len=cfg_int_min_silence_len_ms,
+        silence_thresh=cfg_int_silence_thresh_dbfs,
         keep_silence=int_keep_silence_ms
     )
 
@@ -301,7 +312,9 @@ def generate_audio(text, voice, speed=1.0):
             final_wav_bytes = remove_silence_from_audio(
                 final_wav_bytes,
                 cfg_lt_silence_thresh_dbfs=SR_LT_SILENCE_THRESH_DBFS,
-                cfg_lt_min_silence_duration_ms=SR_LT_MIN_SILENCE_DURATION_MS
+                cfg_lt_min_silence_duration_ms=SR_LT_MIN_SILENCE_DURATION_MS,
+                cfg_int_min_silence_len_ms=SR_INT_MIN_SILENCE_LEN_MS,
+                cfg_int_silence_thresh_dbfs=SR_INT_SILENCE_THRESH_DBFS
             )
             print("Silence removal process completed.")
         else:
