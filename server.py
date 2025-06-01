@@ -56,26 +56,123 @@ AUDIO_CFG_WEIGHT = args.cfg
 SUPPORTED_VOICES=args.supported_voices.split(",")
 SUPPORTED_RESPONSE_FORMATS = ["mp3", "opus", "aac", "flac", "wav", "pcm"]
 
+MAX_CHUNK_LENGTH = 300
+
 print(f"🚀 Running on device: {DEVICE}")
+
+def split_text_into_chunks(text: str, max_length: int = 300) -> list[str]:
+    """
+    Splits a long text into chunks of max_length, trying to respect sentence boundaries.
+    """
+    chunks = []
+    remaining_text = text.strip()
+    sentence_terminators = ".!?"
+
+    while remaining_text:
+        if len(remaining_text) <= max_length:
+            chunk_to_add = remaining_text.strip()
+            if chunk_to_add:  # Ensure non-empty after final strip
+                chunks.append(chunk_to_add)
+            break
+
+        current_slice_len = min(len(remaining_text), max_length)
+        
+        split_at = -1
+        # Try to find the last sentence terminator in the slice
+        # Search from current_slice_len-1 down to 1 (to ensure chunk is not empty if split)
+        for i in range(current_slice_len - 1, 0, -1):
+            if remaining_text[i] in sentence_terminators:
+                split_at = i + 1  # Include the terminator
+                break
+        
+        if split_at == -1:  # No sentence terminator found
+            # Try to find the last space in the slice
+            for i in range(current_slice_len - 1, 0, -1):
+                if remaining_text[i] == ' ':
+                    split_at = i + 1  # Split after space (it will be stripped later)
+                    break
+        
+        if split_at == -1:  # Still no suitable split point (no space/terminator or only at index 0)
+            # Hard cut at max_length
+            split_at = max_length
+        
+        chunk = remaining_text[:split_at].strip()
+        if chunk:  # Add non-empty chunk
+            chunks.append(chunk)
+        
+        remaining_text = remaining_text[split_at:].strip()
+
+    return [c for c in chunks if c] # Filter out any empty strings that might have resulted
 
 app = Flask(__name__)
 # Initialize the TTS model
 tts_model = ChatterboxTTS.from_pretrained(DEVICE)
 
+# Replace the old generate_audio function with this one:
 def generate_audio(text, voice, speed=1.0):
     voice_file = AUDIO_PROMPT_PATH + f"{voice}.wav"
 
-    # Generate the waveform
-    wav = tts_model.generate(
-        text,
-        audio_prompt_path=voice_file,
-        exaggeration=AUDIO_EXAGGERATION,
-        temperature=AUDIO_TEMPERATURE,
-        cfg_weight=AUDIO_CFG_WEIGHT,
-    )
+    text_chunks = split_text_into_chunks(text, max_length=MAX_CHUNK_LENGTH)
 
-    audio_data = wav.squeeze(0).numpy()
-    audio_data = np.clip(audio_data, -1.0, 1.0)  # Clip to prevent saturation
+    if not text_chunks:
+        print("No text chunks to process after splitting.")
+        # Create an empty WAV file if there are no chunks
+        wav_io_empty = io.BytesIO()
+        with wave.open(wav_io_empty, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2) # 2 bytes for int16
+            wf.setframerate(tts_model.sr) # Use model's sample rate
+        wav_io_empty.seek(0)
+        return wav_io_empty.getvalue()
+
+    all_wavs_np = []
+    print(f"Input text split into {len(text_chunks)} chunk(s) of max size {MAX_CHUNK_LENGTH}.")
+
+    for i, chunk in enumerate(text_chunks):
+        # Skip empty chunks (should be filtered by split_text_into_chunks, but as a safeguard)
+        if not chunk.strip():
+            print(f"Skipping empty chunk {i+1}/{len(text_chunks)}.")
+            continue
+        
+        print(f"Generating audio for chunk {i+1}/{len(text_chunks)}: '{chunk[:50]}...'")
+        wav_chunk_tensor = tts_model.generate(
+            chunk,
+            audio_prompt_path=voice_file,
+            exaggeration=AUDIO_EXAGGERATION,
+            temperature=AUDIO_TEMPERATURE,
+            cfg_weight=AUDIO_CFG_WEIGHT,
+        )
+        
+        # Convert tensor to numpy array, ensure it's on CPU
+        wav_chunk_np = wav_chunk_tensor.cpu().numpy()
+        
+        # Ensure wav_chunk_np is 1D for concatenation
+        if wav_chunk_np.ndim > 1 and wav_chunk_np.shape[0] == 1:
+            wav_chunk_np = wav_chunk_np.squeeze(0)
+        elif wav_chunk_np.ndim > 1:
+            # This case is unexpected if model returns (1, N) or (N,)
+            # For robustness, try to flatten, but log a warning.
+            print(f"Warning: Unexpected shape for wav_chunk_np: {wav_chunk_np.shape}. Flattening.")
+            wav_chunk_np = wav_chunk_np.flatten()
+
+        all_wavs_np.append(wav_chunk_np)
+
+    if not all_wavs_np:
+        print("No audio generated for any chunk.")
+        # Create an empty WAV file if no audio was generated
+        wav_io_empty = io.BytesIO()
+        with wave.open(wav_io_empty, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(tts_model.sr)
+        wav_io_empty.seek(0)
+        return wav_io_empty.getvalue()
+
+    final_wav_np = np.concatenate(all_wavs_np)
+    print("Audio generation complete for all chunks.")
+
+    # Process the final concatenated audio
+    audio_data = np.clip(final_wav_np, -1.0, 1.0)  # Clip to prevent saturation
     audio_data = (audio_data * 32767).astype(np.int16)
 
     # Create a BytesIO object to write the WAV file
@@ -83,7 +180,7 @@ def generate_audio(text, voice, speed=1.0):
     with wave.open(wav_io, "wb") as wf:
         wf.setnchannels(1)  # Mono
         wf.setsampwidth(2)  # 2 bytes for int16
-        wf.setframerate(tts_model.sr * speed)  # Sample rate (adjust as needed)
+        wf.setframerate(int(tts_model.sr * speed))  # Apply speed adjustment to final sample rate
         wf.writeframes(audio_data.tobytes())
 
     wav_io.seek(0)
