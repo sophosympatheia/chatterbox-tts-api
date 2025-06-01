@@ -8,6 +8,7 @@ import yaml # Added import
 from chatterbox.tts import ChatterboxTTS
 import argparse
 from pydub import AudioSegment
+from pydub.silence import split_on_silence, detect_leading_silence
 
 parser = argparse.ArgumentParser("server.py")
 parser.add_argument("config_path", help="Path to the YAML configuration file.", type=str)
@@ -126,6 +127,82 @@ app = Flask(__name__)
 # Initialize the TTS model
 tts_model = ChatterboxTTS.from_pretrained(DEVICE)
 
+def remove_silence_from_audio(wav_bytes: bytes) -> bytes:
+    """
+    Removes leading, trailing, and internal silences from WAV audio data.
+    Uses hardcoded parameters for silence detection.
+    """
+    try:
+        audio = AudioSegment.from_wav(io.BytesIO(wav_bytes))
+    except Exception as e:
+        print(f"Error loading audio for silence removal: {e}. Skipping silence removal.")
+        return wav_bytes
+
+    # Parameters for silence detection (inspired by the example)
+    lt_silence_thresh_dbfs = -40
+    lt_min_silence_duration_ms = 500
+    int_min_silence_len_ms = 700
+    int_silence_thresh_dbfs = -35
+    int_keep_silence_ms = 300 # Amount of silence to keep around cuts for internal silences
+
+    original_duration_ms = len(audio)
+    if original_duration_ms == 0:
+        print("Input audio for silence removal is empty. Skipping.")
+        return wav_bytes
+        
+    print(f"Original audio duration for silence removal: {original_duration_ms / 1000:.2f}s")
+
+    # 1. Remove leading silence
+    start_trim = detect_leading_silence(audio, silence_threshold=lt_silence_thresh_dbfs, chunk_size=10)
+    trimmed_leading = audio[start_trim:]
+
+    if len(trimmed_leading) == 0:
+        print("Audio became empty after trimming leading silence. Returning empty audio.")
+        empty_audio_io = io.BytesIO()
+        AudioSegment.empty().export(empty_audio_io, format="wav")
+        empty_audio_io.seek(0)
+        return empty_audio_io.getvalue()
+
+    # 2. Remove trailing silence (by reversing, trimming leading, then reversing back)
+    end_trim = detect_leading_silence(trimmed_leading.reverse(), silence_threshold=lt_silence_thresh_dbfs, chunk_size=10)
+    # Ensure end_trim does not exceed length of reversed audio
+    end_trim = min(end_trim, len(trimmed_leading))
+    trimmed_audio = trimmed_leading.reverse()[end_trim:].reverse()
+    
+    if len(trimmed_audio) == 0:
+        print("Audio became empty after trimming trailing silence. Returning empty audio.")
+        empty_audio_io = io.BytesIO()
+        AudioSegment.empty().export(empty_audio_io, format="wav")
+        empty_audio_io.seek(0)
+        return empty_audio_io.getvalue()
+
+    duration_after_ends_trimmed_ms = len(trimmed_audio)
+    print(f"Duration after trimming leading/trailing silence: {duration_after_ends_trimmed_ms / 1000:.2f}s")
+
+    # 3. Remove awkward pauses (internal silences)
+    chunks = split_on_silence(
+        trimmed_audio,
+        min_silence_len=int_min_silence_len_ms,
+        silence_thresh=int_silence_thresh_dbfs,
+        keep_silence=int_keep_silence_ms
+    )
+
+    if not chunks:
+        print("No chunks after splitting on internal silence (audio might be too short or entirely non-silent after end trimming). Using end-trimmed audio.")
+        cleaned_audio = trimmed_audio # Use the audio that already had ends trimmed
+    else:
+        cleaned_audio = AudioSegment.empty()
+        for chunk in chunks:
+            cleaned_audio += chunk
+    
+    duration_after_internal_removed_ms = len(cleaned_audio)
+    print(f"Duration after removing internal pauses: {duration_after_internal_removed_ms / 1000:.2f}s")
+
+    output_io = io.BytesIO()
+    cleaned_audio.export(output_io, format="wav")
+    output_io.seek(0)
+    return output_io.getvalue()
+
 # Replace the old generate_audio function with this one:
 def generate_audio(text, voice, speed=1.0):
     voice_file = AUDIO_PROMPT_PATH + f"{voice}.wav"
@@ -202,7 +279,17 @@ def generate_audio(text, voice, speed=1.0):
         wf.writeframes(audio_data.tobytes())
 
     wav_io.seek(0)
-    return wav_io.getvalue()  # Return the bytes of the WAV file
+    final_wav_bytes = wav_io.getvalue()
+
+    if REMOVE_SILENCE:
+        if len(final_wav_bytes) > 0: # Only process if there's audio data
+            print("Attempting to remove silence...")
+            final_wav_bytes = remove_silence_from_audio(final_wav_bytes)
+            print("Silence removal process completed.")
+        else:
+            print("Skipping silence removal as generated audio is empty.")
+            
+    return final_wav_bytes
 
 
 def convert_audio_format(audio_data, response_format):
@@ -270,8 +357,8 @@ def speech():
     # Convert the audio data to the desired format
     converted_audio_data = convert_audio_format(audio_data, response_format)
 
-    # Create a BytesIO object for the response
-    audio_io = io.BytesIO(audio_data)
+    # Create a BytesIO object for the response using the converted data
+    audio_io = io.BytesIO(converted_audio_data)
     audio_io.seek(0)
 
     # Set the appropriate MIME type based on the requested response format
