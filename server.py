@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_file
 import io
+import os
 import numpy as np
 import wave
 import torch
@@ -9,11 +10,6 @@ from pydub import AudioSegment
 
 parser = argparse.ArgumentParser("server.py")
 parser.add_argument("voices_dir", help="Path to the audio prompt files dir.", type=str)
-parser.add_argument(
-    "supported_voices",
-    help="Comma-separated list of supported voices. Example: 'alloy,ash,ballad,coral,echo,fable,onyx,nova,sage,shimmer,verse'",
-    type=str
-)
 parser.add_argument(
     "--port", help="Port to run the server on. Default: 5001", type=int, default=5001
 )
@@ -53,7 +49,26 @@ API_HOST = args.host
 AUDIO_EXAGGERATION = args.exaggeration
 AUDIO_TEMPERATURE = args.temperature
 AUDIO_CFG_WEIGHT = args.cfg
-SUPPORTED_VOICES=args.supported_voices.split(",")
+
+# Dynamically build SUPPORTED_VOICES from voices_dir
+try:
+    SUPPORTED_VOICES = sorted([
+        f.rsplit('.', 1)[0]
+        for f in os.listdir(AUDIO_PROMPT_PATH)
+        if os.path.isfile(os.path.join(AUDIO_PROMPT_PATH, f)) and f.lower().endswith('.wav')
+    ])
+    if not SUPPORTED_VOICES:
+        print(f"Warning: No .wav files found in {AUDIO_PROMPT_PATH}. No voices will be supported.")
+    else:
+        print(f"Supported voices found: {', '.join(SUPPORTED_VOICES)}")
+except FileNotFoundError:
+    print(f"Error: The voices_dir '{AUDIO_PROMPT_PATH}' was not found. Please check the path.")
+    SUPPORTED_VOICES = []
+except Exception as e:
+    print(f"Error scanning voices_dir '{AUDIO_PROMPT_PATH}': {e}")
+    SUPPORTED_VOICES = []
+
+
 SUPPORTED_RESPONSE_FORMATS = ["mp3", "opus", "aac", "flac", "wav", "pcm"]
 
 MAX_CHUNK_LENGTH = 300
