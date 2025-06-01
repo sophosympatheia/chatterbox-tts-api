@@ -16,11 +16,12 @@ text_processing:
 
 # Silence removal settings
 silence_removal:
-  enabled: false # Master switch for silence removal
+  enabled: true # Master switch for silence removal
   # Parameters for leading and trailing silence detection
   lt_silence_thresh_dbfs: -40     # Quieter than this is silence (dBFS) for leading/trailing
-  lt_min_silence_duration_ms: 500  # Minimum duration of silence (ms) for leading/trailing
+  lt_min_silence_duration_ms: 1500  # Minimum duration of silence (ms) for leading/trailing
   # Parameters for internal silence detection
-  int_min_silence_len_ms: 700     # Minimum duration of internal silence to be considered for removal (ms)
+  int_min_silence_len_ms: 1500     # Minimum duration of internal silence to be considered for removal (ms)
   int_silence_thresh_dbfs: -35    # Silence threshold (dBFS) for internal silences
   # Note: int_keep_silence_ms is still hardcoded in the remove_silence_from_audio function.
+
