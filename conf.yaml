@@ -4,6 +4,7 @@ server_settings:
   host: "127.0.0.1"
 
 # Audio generation parameters
+# See https://github.com/resemble-ai/chatterbox for more details
 audio_generation:
   exaggeration: 0.6 # Controls how 'emotional' or 'creative' the audio will be. Lower values tend towards monotonous, predictable output. Higher values produce varied, emotionally dynamic outputs. 0.5 is a good starting value.
   temperature: 0.8 # Recommend to leave it at 0.8
