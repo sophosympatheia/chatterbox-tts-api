@@ -5,15 +5,15 @@ server_settings:
 
 # Audio generation parameters
 audio_generation:
-  exaggeration: 0.5
-  temperature: 0.8
-  cfg_weight: 0.5
-  seed: 0 # Seed for reproducibility. If 0, passed directly. If non-zero, set_seed() is called first.
-  default_response_format: "wav" # Default audio output format. Options: "mp3", "opus", "aac", "flac", "wav", "pcm"
+  exaggeration: 0.6 # Controls how 'emotional' or 'creative' the audio will be. Lower values tend towards monotonous, predictable output. Higher values produce varied, emotionally dynamic outputs. 0.5 is a good starting value.
+  temperature: 0.8 # Recommend to leave it at 0.8
+  cfg_weight: 0.5 # Roughly controls 'variability' and 'pacing' of the audio. Lower values slow it down, keep it more even. Higher values speed it up, make it more dynamic. 0.5 is a good starting value.
+  seed: 4000 # Seed for reproducibility. 0 is randomized.
+  default_response_format: "wav" # Options: "mp3", "opus", "aac", "flac", "wav", "pcm"
 
 # Text processing
 text_processing:
-  chunk_size: 240 # Maximum length for text chunks
+  chunk_size: 240 # Maximum length for text chunks. Going over 300 is not recommended.
 
 # Silence removal settings
 # EXPERIMENTAL! Need tuning.
