@@ -37,11 +37,17 @@ audio_gen_config = config.get('audio_generation', {})
 AUDIO_EXAGGERATION = audio_gen_config.get('exaggeration', 0.5)
 AUDIO_TEMPERATURE = audio_gen_config.get('temperature', 0.8)
 AUDIO_CFG_WEIGHT = audio_gen_config.get('cfg_weight', 0.5)
-REMOVE_SILENCE = audio_gen_config.get('remove_silence', False) # New setting
+# REMOVE_SILENCE is now part of silence_removal section
 
 # Text Processing Settings
 text_proc_config = config.get('text_processing', {})
 MAX_CHUNK_LENGTH = text_proc_config.get('chunk_size', 300)
+
+# Silence Removal Settings
+silence_config = config.get('silence_removal', {})
+REMOVE_SILENCE_ENABLED = silence_config.get('enabled', False)
+SR_LT_SILENCE_THRESH_DBFS = silence_config.get('lt_silence_thresh_dbfs', -40)
+SR_LT_MIN_SILENCE_DURATION_MS = silence_config.get('lt_min_silence_duration_ms', 500)
 
 
 AUDIO_PROMPT_PATH = args.voices_dir
@@ -76,7 +82,11 @@ SUPPORTED_RESPONSE_FORMATS = ["mp3", "opus", "aac", "flac", "wav", "pcm"]
 print(f"🚀 Running on device: {DEVICE}")
 print(f"📝 Loaded configuration from: {args.config_path}")
 print(f"🔊 Voices directory: {AUDIO_PROMPT_PATH}")
-print(f"⚙️ Settings: Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, ChunkSize={MAX_CHUNK_LENGTH}, RemoveSilence={REMOVE_SILENCE}")
+base_settings_info = f"Port={API_PORT}, Host={API_HOST}, Exaggeration={AUDIO_EXAGGERATION}, Temp={AUDIO_TEMPERATURE}, CFG={AUDIO_CFG_WEIGHT}, ChunkSize={MAX_CHUNK_LENGTH}"
+silence_settings_info = f"RemoveSilenceEnabled={REMOVE_SILENCE_ENABLED}"
+if REMOVE_SILENCE_ENABLED:
+    silence_settings_info += f", LtSilenceThresh={SR_LT_SILENCE_THRESH_DBFS}dBFS, LtMinSilenceDur={SR_LT_MIN_SILENCE_DURATION_MS}ms"
+print(f"⚙️ Settings: {base_settings_info}, {silence_settings_info}")
 
 
 def split_text_into_chunks(text: str, max_length: int) -> list[str]: # max_length will be passed MAX_CHUNK_LENGTH
@@ -127,10 +137,11 @@ app = Flask(__name__)
 # Initialize the TTS model
 tts_model = ChatterboxTTS.from_pretrained(DEVICE)
 
-def remove_silence_from_audio(wav_bytes: bytes) -> bytes:
+def remove_silence_from_audio(wav_bytes: bytes, cfg_lt_silence_thresh_dbfs: int, cfg_lt_min_silence_duration_ms: int) -> bytes:
     """
     Removes leading, trailing, and internal silences from WAV audio data.
-    Uses hardcoded parameters for silence detection.
+    Leading/trailing silence parameters are configurable.
+    Internal silence parameters are currently hardcoded.
     """
     try:
         audio = AudioSegment.from_wav(io.BytesIO(wav_bytes))
@@ -138,9 +149,12 @@ def remove_silence_from_audio(wav_bytes: bytes) -> bytes:
         print(f"Error loading audio for silence removal: {e}. Skipping silence removal.")
         return wav_bytes
 
-    # Parameters for silence detection (inspired by the example)
-    lt_silence_thresh_dbfs = -40
-    lt_min_silence_duration_ms = 500
+    # Parameters for silence detection
+    # Leading/Trailing from config
+    # lt_silence_thresh_dbfs = -40 # Now from arg: cfg_lt_silence_thresh_dbfs
+    # lt_min_silence_duration_ms = 500 # Now from arg: cfg_lt_min_silence_duration_ms
+    
+    # Internal (still hardcoded)
     int_min_silence_len_ms = 700
     int_silence_thresh_dbfs = -35
     int_keep_silence_ms = 300 # Amount of silence to keep around cuts for internal silences
@@ -153,7 +167,7 @@ def remove_silence_from_audio(wav_bytes: bytes) -> bytes:
     print(f"Original audio duration for silence removal: {original_duration_ms / 1000:.2f}s")
 
     # 1. Remove leading silence
-    start_trim = detect_leading_silence(audio, silence_threshold=lt_silence_thresh_dbfs, chunk_size=10)
+    start_trim = detect_leading_silence(audio, silence_threshold=cfg_lt_silence_thresh_dbfs, chunk_size=10)
     trimmed_leading = audio[start_trim:]
 
     if len(trimmed_leading) == 0:
@@ -164,7 +178,7 @@ def remove_silence_from_audio(wav_bytes: bytes) -> bytes:
         return empty_audio_io.getvalue()
 
     # 2. Remove trailing silence (by reversing, trimming leading, then reversing back)
-    end_trim = detect_leading_silence(trimmed_leading.reverse(), silence_threshold=lt_silence_thresh_dbfs, chunk_size=10)
+    end_trim = detect_leading_silence(trimmed_leading.reverse(), silence_threshold=cfg_lt_silence_thresh_dbfs, chunk_size=10)
     # Ensure end_trim does not exceed length of reversed audio
     end_trim = min(end_trim, len(trimmed_leading))
     trimmed_audio = trimmed_leading.reverse()[end_trim:].reverse()
@@ -281,10 +295,14 @@ def generate_audio(text, voice, speed=1.0):
     wav_io.seek(0)
     final_wav_bytes = wav_io.getvalue()
 
-    if REMOVE_SILENCE:
+    if REMOVE_SILENCE_ENABLED:
         if len(final_wav_bytes) > 0: # Only process if there's audio data
             print("Attempting to remove silence...")
-            final_wav_bytes = remove_silence_from_audio(final_wav_bytes)
+            final_wav_bytes = remove_silence_from_audio(
+                final_wav_bytes,
+                cfg_lt_silence_thresh_dbfs=SR_LT_SILENCE_THRESH_DBFS,
+                cfg_lt_min_silence_duration_ms=SR_LT_MIN_SILENCE_DURATION_MS
+            )
             print("Silence removal process completed.")
         else:
             print("Skipping silence removal as generated audio is empty.")
