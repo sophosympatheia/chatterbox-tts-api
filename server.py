@@ -250,7 +250,7 @@ def generate_audio(text, voice, speed=1.0):
         print(f"Setting global seed to: {AUDIO_SEED}")
         set_seed(AUDIO_SEED)
     else:
-        print(f"Using seed {AUDIO_SEED} directly for TTS generation without setting global seed.")
+        print(f"AUDIO_SEED is {AUDIO_SEED}, not setting a global seed. TTS will use its default (likely random) seed behavior.")
 
     text_chunks = split_text_into_chunks(text, max_length=MAX_CHUNK_LENGTH) # Pass configured MAX_CHUNK_LENGTH
 
@@ -280,7 +280,6 @@ def generate_audio(text, voice, speed=1.0):
             audio_prompt_path=voice_file,
             exaggeration=AUDIO_EXAGGERATION,
             temperature=AUDIO_TEMPERATURE,
-            seed_num=AUDIO_SEED,
             cfg_weight=AUDIO_CFG_WEIGHT,
         )
         
